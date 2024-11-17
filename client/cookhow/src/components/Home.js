@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import MealGrid from './MealGrid';
 import  Posts  from './Posts';
+import Discover from './Discover';
 
 const Home = () => {
   const [user, setUser] = useState(null);
@@ -30,6 +31,7 @@ const Home = () => {
           <h1>You are logged in... {user.name}</h1>
           <Posts/>
           <MealGrid />
+          <Discover/>
         </div>
       ) : (
         <div>

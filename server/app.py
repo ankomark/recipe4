@@ -176,6 +176,24 @@ def foods():
             "cooking_method": new_food.cooking_method,
             "rating": new_food.rating
         }), 201
+@app.route('/foods/<int:id>', methods=['GET'])
+def get_food(id):
+    """Route to fetch detailed information about a specific food item."""
+    food = Food.query.get(id)
+    if not food:
+        return jsonify({'error': 'Food item not found'}), 404
+    return jsonify({
+        "id": food.id,
+        "image_url": food.image_url,
+        "food_name": food.food_name,
+        "food_type": food.food_type,
+        "food_country": food.food_country,
+        "ingredients": food.ingredients,
+        "preparation_steps": food.preparation_steps,
+        "cooking_time": food.cooking_time,
+        "cooking_method": food.cooking_method,
+        "rating": food.rating
+    })
 
 @app.route('/uploads/<filename>')
 def get_image(filename):
@@ -205,21 +223,28 @@ def update_food(id):
     db.session.commit()
 
     return jsonify({'message': 'Food updated successfully!'})
-
 @app.route('/foods/<int:id>', methods=['DELETE'])
 def delete_food(id):
     """ Route to delete a food item """
     user = get_logged_in_user()
+    print(f"Logged-in user: {user}")
     if not user:
         return jsonify({'error': 'Unauthorized'}), 401
 
     food = Food.query.filter_by(id=id, user_id=user.id).first()
+    print(f"Food Query Result: {food}")
     if not food:
         return jsonify({'error': 'Food not found or unauthorized'}), 404
 
-    db.session.delete(food)
-    db.session.commit()
-    return jsonify({'message': 'Food deleted successfully!'})
+    try:
+        db.session.delete(food)
+        db.session.commit()
+        return jsonify({'message': 'Food deleted successfully!'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Delete failed: {str(e)}'}), 500
+
+
 
 # Additional Routes for Likes, Comments, and Ratings
 # @app.route('/foods/<int:id>/like', methods=[ 'PATCH'])
@@ -275,17 +300,30 @@ def comment_food(id):
     db.session.commit()
     return jsonify({'message': 'Comment added successfully!'})
 
-@app.route('/foods/<int:id>/rate', methods=['POST'])
+
+
+
+@app.route('/foods/<int:id>/rate', methods=['PATCH'])
 def rate_food(id):
-    """ Route for rating a food item """
+    """Route for updating the rating of a food item."""
     user = get_logged_in_user()
     if not user:
         return jsonify({'error': 'Unauthorized'}), 401
+
+    food = Food.query.get(id)
+    if not food:
+        return jsonify({'error': 'Food not found'}), 404
+
     data = request.json
-    rating = Rating(user_id=user.id, food_id=id, rating=data['rating'])
-    db.session.add(rating)
+    new_rating = data.get('rating')
+    if not (0 <= new_rating <= 5):
+        return jsonify({'error': 'Rating must be between 0 and 5'}), 400
+
+    food.rating = new_rating
     db.session.commit()
-    return jsonify({'message': 'Rating added successfully!'})
+
+    return jsonify({'rating': food.rating})
+
 
 if __name__ == '__main__':
     app.run(debug=True)

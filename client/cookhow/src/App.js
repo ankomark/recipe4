@@ -6,6 +6,8 @@ import Login from './components/Login'; // Ensure correct path
 import Register from './components/Register'; // Ensure correct path
 import MealGrid from './components/MealGrid';
 import ExternalLinkPage from './components/ExternalLinkPage'; // Ensure correct path
+import Discover from './components/Discover';
+import DetailedFood from './components/DetailedFood';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -19,6 +21,8 @@ function App() {
         <Route path="/register" element={<Register setUser={setUser} />} />
         <Route path="/MealGrid" element={<MealGrid />} />
         <Route path="/meal/:mealId" element={<ExternalLinkPage />} />
+        <Route path="/meal/:mealId" element={<Discover />} />
+        <Route path="/foods/:id" element={<DetailedFood />} />
       </Routes>
     </Router>
   );
