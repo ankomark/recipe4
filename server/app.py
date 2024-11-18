@@ -211,7 +211,7 @@ def update_food(id):
     if not food:
         return jsonify({'error': 'Food not found or unauthorized'}), 404
 
-    data = request.json
+    data = request.form
     food.food_name = data['food_name']
     food.food_type = data['food_type']
     food.food_country = data['food_country']
@@ -220,9 +220,18 @@ def update_food(id):
     food.cooking_time = data['cooking_time']
     food.cooking_method = data['cooking_method']
     food.rating = data['rating']
-    db.session.commit()
 
+    # Handle image file
+    if 'image' in request.files:
+        image = request.files['image']
+        if image.filename != '':
+            filename = secure_filename(image.filename)
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            food.image_path = filename  # Assuming a column for image path
+
+    db.session.commit()
     return jsonify({'message': 'Food updated successfully!'})
+
 @app.route('/foods/<int:id>', methods=['DELETE'])
 def delete_food(id):
     """ Route to delete a food item """
@@ -245,25 +254,9 @@ def delete_food(id):
         return jsonify({'error': f'Delete failed: {str(e)}'}), 500
 
 
-
-# Additional Routes for Likes, Comments, and Ratings
-# @app.route('/foods/<int:id>/like', methods=[ 'PATCH'])
-# def like_food(id):
-#     """ Route for liking a food item """
-#     user = get_logged_in_user()
-#     if not user:
-#         return jsonify({'error': 'Unauthorized'}), 401
-#     food = Food.query.get(id)
-#     if not food:
-#         return jsonify({'error': 'Food not found'}), 404
-    
-#     like = Like(user_id=user.id, food_id=id)
-#     db.session.add(like)
-#     db.session.commit()
-#     return jsonify({'message': 'Food liked successfully!'})
 @app.route('/foods/<int:id>/like', methods=['PATCH'])
 def like_food(id):
-    """ Route to handle liking a food item """
+    """Route to handle liking a food item."""
     user = get_logged_in_user()
     if not user:
         return jsonify({'error': 'User unauthorized'}), 401
@@ -285,7 +278,21 @@ def like_food(id):
 
     # Return updated like count
     likes_count = Like.query.filter_by(food_id=food.id).count()
+    return jsonify({
+        'likes': likes_count,
+        'message': 'Food liked successfully!'
+    })
+
+@app.route('/foods/<int:id>/likes', methods=['GET'])
+def get_likes(id):
+    """Route to fetch the like count for a food item."""
+    food = Food.query.get(id)
+    if not food:
+        return jsonify({'error': 'Food item not found'}), 404
+
+    likes_count = Like.query.filter_by(food_id=food.id).count()
     return jsonify({'likes': likes_count})
+
 
 
 @app.route('/foods/<int:id>/comments', methods=['POST'])
@@ -294,11 +301,29 @@ def comment_food(id):
     user = get_logged_in_user()
     if not user:
         return jsonify({'error': 'Unauthorized'}), 401
+
     data = request.json
-    comment = Comment(user_id=user.id, food_id=id, text=data['text'])
+
+    # Validate the payload
+    if not data or 'text' not in data or not isinstance(data['text'], str) or not data['text'].strip():
+        return jsonify({'error': 'Invalid payload: "text" field is required and cannot be empty.'}), 400
+
+    # Proceed with creating the comment
+    comment = Comment(user_id=user.id, food_id=id, content=data['text'].strip())
     db.session.add(comment)
     db.session.commit()
-    return jsonify({'message': 'Comment added successfully!'})
+
+    # Return the newly created comment with additional information
+    return jsonify({
+        'message': 'Comment added successfully!',
+        'comment': {
+            'id': comment.id,
+            'content': comment.content,
+            'created_at': comment.created_at
+        }
+    })
+
+
 
 
 

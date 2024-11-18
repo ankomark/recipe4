@@ -1,3 +1,4 @@
+
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from uuid import uuid4
@@ -17,10 +18,10 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
 
     # Relationships
-    foods = db.relationship('Food', backref='user', lazy=True)
-    likes = db.relationship('Like', backref='user', lazy=True)
-    comments = db.relationship('Comment', backref='user', lazy=True)
-    ratings = db.relationship('Rating', backref='user', lazy=True)
+    foods = db.relationship('Food', backref='user', lazy=True, cascade="all, delete-orphan")
+    likes = db.relationship('Like', backref='user', lazy=True, cascade="all, delete-orphan")
+    comments = db.relationship('Comment', backref='user', lazy=True, cascade="all, delete-orphan")
+    ratings = db.relationship('Rating', backref='user', lazy=True, cascade="all, delete-orphan")
 
     def __init__(self, name, email, password):
         self.name = name
@@ -48,12 +49,12 @@ class Food(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp(), onupdate=db.func.current_timestamp())
 
     # Foreign key and relationship to User
-    user_id = db.Column(db.String(32), db.ForeignKey('users.id'), nullable=False)
+    user_id = db.Column(db.String(32), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
 
     # Relationships
-    likes = db.relationship('Like', backref='food', lazy=True)
-    comments = db.relationship('Comment', backref='food', lazy=True)
-    ratings = db.relationship('Rating', backref='food', lazy=True)
+    likes = db.relationship('Like', backref='food', lazy=True, cascade="all, delete-orphan")
+    comments = db.relationship('Comment', backref='food', lazy=True, cascade="all, delete-orphan")
+    ratings = db.relationship('Rating', backref='food', lazy=True, cascade="all, delete-orphan")
 
     def __init__(self, image_url, food_name, food_type, food_country, ingredients, preparation_steps, cooking_time, cooking_method, rating, user_id):
         self.image_url = image_url
@@ -75,8 +76,8 @@ class Like(db.Model):
     __tablename__ = 'likes'
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.String(32), db.ForeignKey('users.id'), nullable=False)
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable=False)
+    user_id = db.Column(db.String(32), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    food_id = db.Column(db.Integer, db.ForeignKey('foods.id', ondelete='CASCADE'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
@@ -87,15 +88,13 @@ class Comment(db.Model):
     __tablename__ = 'comments'
 
     id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.Text, nullable=False)
+    content = db.Column(db.Text, nullable=False)  # Decide on one field: "content"
     created_at = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
 
     # Foreign keys
-    user_id = db.Column(db.String(32), db.ForeignKey('users.id'), nullable=False)
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable=False)
+    user_id = db.Column(db.String(32), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    food_id = db.Column(db.Integer, db.ForeignKey('foods.id', ondelete='CASCADE'), nullable=False)  # Fixed trailing comma
 
-    def __repr__(self):
-        return f"<Comment {self.content[:20]}...>"
 
 
 class Rating(db.Model):
@@ -106,8 +105,8 @@ class Rating(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Foreign keys
-    user_id = db.Column(db.String(32), db.ForeignKey('users.id'), nullable=False)
-    food_id = db.Column(db.Integer, db.ForeignKey('foods.id'), nullable=False)
+    user_id = db.Column(db.String(32), db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    food_id = db.Column(db.Integer, db.ForeignKey('foods.id', ondelete='CASCADE'), nullable=False)
 
     def __repr__(self):
         return f"<Rating {self.rating} User:{self.user_id} Food:{self.food_id}>"

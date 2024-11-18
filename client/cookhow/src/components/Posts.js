@@ -26,10 +26,22 @@ const Posts = () => {
     const [comments, setComments] = useState({});
     const [newComment, setNewComment] = useState('');
     const [likedFoods, setLikedFoods] = useState(new Set()); // Track liked foods by ID
+    const [foodLikes, setFoodLikes] = useState({});
+
+
+
     const userId = 1;
     
 
+   
     useEffect(() => {
+
+      // Load likes from localStorage
+      const storedLikedFoods = JSON.parse(localStorage.getItem('likedFoods') || '{}');
+      const storedFoodLikes = JSON.parse(localStorage.getItem('foodLikes')) || {};
+
+    setLikedFoods(storedLikedFoods);
+    setFoodLikes(storedFoodLikes);  
         fetchFoods();
     }, []);
 
@@ -37,10 +49,115 @@ const Posts = () => {
         try {
             const response = await axios.get('//localhost:5000/foods');
             setFoods(response.data);
+
+            // Initialize likes state
+            const foodLikesData = {};
+            response.data.forEach(food => {
+                foodLikesData[food.id] = food.likes || 0; // Default to 0 if no likes
+            });
+            setFoodLikes(foodLikesData);
+
+            // Initialize liked foods set for the user
+            const userLikedFoods = new Set();
+            response.data.forEach(food => {
+                if (food.likes && food.likes.includes(userId)) {
+                    userLikedFoods.add(food.id);
+                }
+            });
+            setLikedFoods(userLikedFoods);
+
         } catch (error) {
             console.error('Error fetching foods:', error.response ? error.response.data : error);
         }
     };
+
+    const likeFood = async (id, userId) => {
+        try {
+            // Make PATCH request to like a food item
+            const response = await axios.patch(
+                `//localhost:5000/foods/${id}/like`, // Ensure this URL matches your backend endpoint
+                {}, // No payload needed, user is identified in the backend
+                { headers: { 'Content-Type': 'application/json' } }
+            );
+    
+            // Update the local state with the new like count from the response
+            setFoodLikes((prevLikes) => ({
+                ...prevLikes,
+                [id]: response.data.likes,
+            }));
+    
+            // Mark the food item as liked by the current user
+            setLikedFoods((prevLikes) => {
+                const newLikes = new Set(prevLikes);
+                newLikes.add(id);
+                return newLikes;
+            });
+    
+            console.log("Food liked successfully:", response.data.message);
+        } catch (error) {
+            // Handle errors from the backend
+            const errorMessage = error.response?.data?.error || "An error occurred while liking the food item.";
+            console.error(errorMessage);
+            alert(errorMessage);
+        }
+    };
+    // const fetchFoods = async () => {
+    //     try {
+    //       const response = await axios.get('//localhost:5000/foods');
+    //       setFoods(response.data);
+    
+    //       // Initialize likes state from backend response if not in local storage
+    //       const foodLikesData = {};
+    //       response.data.forEach(food => {
+    //         foodLikesData[food.id] = food.likes || 0; // Default to 0 if no likes
+    //       });
+    //       setFoodLikes(foodLikesData);
+    
+    //       // Initialize liked foods set for the user
+    //       const userLikedFoods = new Set();
+    //       response.data.forEach(food => {
+    //         if (food.likes && food.likes.includes(userId)) {
+    //           userLikedFoods.add(food.id);
+    //         }
+    //       });
+    //       setLikedFoods(userLikedFoods);
+    //     } catch (error) {
+    //       console.error('Error fetching foods:', error.response ? error.response.data : error);
+    //     }
+    //   };
+    
+    //   const likeFood = async (id, userId) => {
+    //     try {
+    //       const response = await axios.patch(
+    //         `//localhost:5000/foods/${id}/like`,
+    //         {}, // No payload needed
+    //         { headers: { 'Content-Type': 'application/json' } }
+    //       );
+    
+    //       // Update the local state with the new like count from the response
+    //       setFoodLikes(prevLikes => {
+    //         const newLikes = { ...prevLikes, [id]: response.data.likes };
+    //         localStorage.setItem('foodLikes', JSON.stringify(newLikes)); // Save to localStorage
+    //         return newLikes;
+    //       });
+    
+    //       // Mark the food item as liked by the current user
+    //       setLikedFoods(prevLikes => {
+    //         const newLikes = new Set(prevLikes);
+    //         newLikes.add(id);
+    //         localStorage.setItem('likedFoods', JSON.stringify(Object.fromEntries(newLikes))); // Save to localStorage
+    //         return newLikes;
+    //       });
+    
+    //       console.log("Food liked successfully:", response.data.message);
+    //     } catch (error) {
+    //       const errorMessage = error.response?.data?.error || "An error occurred while liking the food item.";
+    //       console.error(errorMessage);
+    //       alert(errorMessage);
+    //     }
+    //   };
+    
+    
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -56,22 +173,27 @@ const Posts = () => {
         try {
             const formData = new FormData();
             Object.keys(newFood).forEach((key) => formData.append(key, newFood[key]));
-            formData.append('image', image);
-
+            if (image) formData.append('image', image); // Attach image if present
+    
             if (editingFoodId) {
-                await axios.put(`//localhost:5000/foods/${editingFoodId}`, formData);
+                await axios.put(`//localhost:5000/foods/${editingFoodId}`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
                 setEditingFoodId(null);
             } else {
-                const response = await axios.post('//localhost:5000/foods', formData);
+                const response = await axios.post('//localhost:5000/foods', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
                 setFoods([...foods, response.data]);
             }
-            
+    
             fetchFoods();
             resetForm();
         } catch (error) {
             console.error('Error saving food:', error.response ? error.response.data : error);
         }
     };
+    
 
     const resetForm = () => {
         setNewFood({
@@ -103,50 +225,9 @@ const Posts = () => {
         setIsFormVisible(true);
     };
 
-    // const likeFood = async (id, userId) => {
-    //     try {
-    //         const response = await axios.patch(
-    //             `//localhost:5000/foods/${id}/like`, // Correct URL format
-    //             { user_id: userId }, // Pass user_id in the request body
-    //             {
-    //                 headers: {
-    //                     'Content-Type': 'application/json'
-    //                 }
-    //             }
-    //         );
-    
-    //         // Update state with new likes count
-    //         setFoods(foods.map(food => food.id === id ? { ...food, likes: response.data.likes } : food));
-    //     } catch (error) {
-    //         console.error('Error liking food:', error.response ? error.response.data : error);
-    //     }
-    // };
-    const likeFood = async (id, userId) => {
+      const addComment = async (id) => {
         try {
-          const response = await axios.patch(
-            `//localhost:5000/foods/${id}/like`, 
-            { user_id: userId }, 
-            { headers: { 'Content-Type': 'application/json' } }
-          );
-          
-          if (response.data.likes) {
-            setLikedFoods((prevLikes) => {
-              const newLikes = new Set(prevLikes);
-              newLikes.add(id); // Add to liked set
-              return newLikes;
-            });
-          }
-        } catch (error) {
-          console.error("Error liking the food item:", error);
-        }
-      };
-    
-    
-    
-
-    const addComment = async (id) => {
-        try {
-            const response = await axios.post(`//localhost:5000/foods/${id}/comments`, { comment: newComment });
+            const response = await axios.post(`//localhost:5000/foods/${id}/comments`, { text: newComment });
             setComments({
                 ...comments,
                 [id]: [...(comments[id] || []), response.data.comment],
@@ -154,6 +235,7 @@ const Posts = () => {
             setNewComment('');
         } catch (error) {
             console.error('Error adding comment:', error.response ? error.response.data : error);
+            alert('There was an error adding your comment. Please try again!');
         }
     };
 
@@ -180,15 +262,24 @@ const Posts = () => {
             <p className="text-gray-600">Country: <span className="font-semibold">{food.food_country}</span></p>
             
             <p className="text-gray-600">Rating: <span className="font-semibold">{food.rating}</span></p>
-            <p className="text-gray-600">Likes: <span className="font-semibold">{food.likes || 0}</span></p>
+            {/* <p className="text-gray-600">Likes: <span className="font-semibold">{food.likes || 0}</span></p> */}
       
-            {/* Like Button */}
-            <button
-              onClick={() => likeFood(food.id, userId)} 
-              className={`text-2xl ${likedFoods.has(food.id) ? 'text-red-500' : 'text-gray-500'}`}
-            >
-              {likedFoods.has(food.id) ? '❤️' : '🤍'} {/* Heart icon changes */}
-            </button>
+           {/* Like Button */}
+<div className="like-section mt-4">
+<button
+        onClick={() => likeFood(food.id, userId)} 
+        className={`text-2xl ${likedFoods.has(food.id) ? 'text-red-500' : 'text-gray-500'}`}
+    >
+        {likedFoods.has(food.id) ? '❤️' : '🤍'} {/* Heart icon changes */}
+    </button>
+
+    {/* Display the updated like count */}
+    <p className="text-gray-600 mt-1">
+        {foodLikes[food.id] || 0} Likes {/* Show the number of likes */}
+    </p>
+
+  
+</div>
             
             <button onClick={() => deleteFood(food.id)} className="text-gray-500 hover:text-red-500">
                     <FaTrash className="mr-2" />
@@ -196,32 +287,43 @@ const Posts = () => {
             <button onClick={() => editFood(food)} className=" text-red px-4 py-2 w-4  rounded-md mt-2 ml-2">
                 <FaEdit className="mr-2" /></button>
       
-            {/* Comments Section */}
-            <div className="mt-4">
-              <h4 className="text-gray-700 font-semibold">Comments:</h4>
-              {(comments[food.id] || []).map((comment, index) => (
-                <p key={index} className="text-gray-600 mt-1">{comment}</p>
-              ))}
-                    <input
-                        type="text"
-                        placeholder="Add a comment..."
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        className="w-full p-2 mt-2 border rounded-md"
-                    />
-                    <Link
-                    to={`/foods/${food.id}`}
-                    className="text-blue-500 hover:text-blue-700 mt-4 block"
-                >
-                    View More
-                </Link>
-                    <button
-                        onClick={() => addComment(food.id)}
-                        className="bg-blue-500 text-white px-4  py-2 rounded-md mt-2">
-                         Comment
-                    </button>
-                </div>
-                <div className="mt-4">
+          {/* Comments Section */}
+                           {/* Comments Section */}
+<div className="mt-4">
+    <h4 className="text-gray-700 font-semibold">Comments:</h4>
+    {/* Render comments for the specific food item */}
+    {(comments[food.id] || []).map((comment, index) => (
+        <p key={index} className="text-gray-600 mt-1">{comment.content}</p>  
+    ))}
+
+    {/* Input field for adding a new comment */}
+    <input
+        type="text"
+        placeholder="Add a comment..."
+        value={newComment}
+        onChange={(e) => setNewComment(e.target.value)}
+        className="w-full p-2 mt-2 border rounded-md"
+    />
+    
+    {/* View More link */}
+    <Link
+        to={`/foods/${food.id}`}
+        className="text-blue-500 hover:text-blue-700 mt-4 block"
+    >
+        View More
+    </Link>
+    
+    {/* Button to submit the new comment */}
+    <button
+        onClick={() => addComment(food.id)}
+        className="bg-blue-500 text-white px-4 py-2 rounded-md mt-2"
+    >
+        Comment
+    </button>
+</div>
+<div className="mt-4">
+
+
                     <label className="text-gray-600"> </label>
                     <StarRating food={food} handleRatingChange={handleRatingChange} />
 
